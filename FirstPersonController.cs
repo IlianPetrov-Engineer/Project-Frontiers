@@ -1,36 +1,15 @@
-﻿using Cinemachine;
-using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-
+﻿using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
-
 namespace StarterAssets
 {
 	[RequireComponent(typeof(CharacterController))]
-	[RequireComponent(typeof(AudioSource))]
-    [RequireComponent(typeof(CinemachineImpulseSource))]
 #if ENABLE_INPUT_SYSTEM
-    [RequireComponent(typeof(PlayerInput))]
+	[RequireComponent(typeof(PlayerInput))]
 #endif
-
-    [System.Serializable]
-    public class SoundElement
-    {
-        [Tooltip("Surface tag associated with the sound list below.")]
-        public string surfaceType;
-        [Tooltip("A list of footsteps sounds for the selected surface.")]
-        public List<AudioClip> surfaceSounds;
-        [Tooltip("The delay between the footsteps sounds.")]
-        public float footstepsSoundDelay = 0.35f;
-    }
-
-
-    public class FirstPersonController : MonoBehaviour
+	public class FirstPersonController : MonoBehaviour
 	{
 		[Header("Player")]
 		[Tooltip("Move speed of the character in m/s")]
@@ -54,19 +33,7 @@ namespace StarterAssets
 		[Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs")]
 		public float FallTimeout = 0.15f;
 
-        [Header("Sounds")]
-        [Tooltip("A sound list contains SoundElement class objects for setting up different tegs with different sounds")]
-        public List<SoundElement> footstepsSounds; // A sound list contains SoundElement class objects for setting up different tegs with different sounds
-        [Tooltip("A sound list contains default footsteps sound that will be used if the surface doesn't have a surface tag")]
-        public List<AudioClip> defaultFootstepsSounds; // A sound list contains default footsteps sound that will be used if the surface doesn't have a surface tag
-        [Tooltip("The delay between the default footsteps sounds")]
-        public float defaultFootstepsSoundDelay = 0.35f;
-
-        [Space(10)]
-        [Tooltip("The layer mask of the terrain")]
-        public LayerMask groundLayerMask;
-
-        [Header("Player Grounded")]
+		[Header("Player Grounded")]
 		[Tooltip("If the character is grounded or not. Not part of the CharacterController built in grounded check")]
 		public bool Grounded = true;
 		[Tooltip("Useful for rough ground")]
@@ -83,28 +50,18 @@ namespace StarterAssets
 		public float TopClamp = 90.0f;
 		[Tooltip("How far in degrees can you move the camera down")]
 		public float BottomClamp = -90.0f;
-		[Tooltip("The amount of shake effect applied when moving")]
-		public float cameraShakeMultiplier = 0.05f;
 
 		// cinemachine
 		private float _cinemachineTargetPitch;
-		private CinemachineImpulseSource _cinemachineImpulseSource;
 
 		// player
 		private float _speed;
 		private float _rotationVelocity;
 		private float _verticalVelocity;
 		private float _terminalVelocity = 53.0f;
-		private float _moving;
 
-        // audio
-        private AudioSource _audioSource;
-        private Coroutine _activeMovingEffectsCoroutine;
-		private List<AudioClip> _activeSoundsList;
-		private float _activeFootstepsSoundDelay;
-
-        // timeout deltatime
-        private float _jumpTimeoutDelta;
+		// timeout deltatime
+		private float _jumpTimeoutDelta;
 		private float _fallTimeoutDelta;
 
 	
@@ -114,6 +71,7 @@ namespace StarterAssets
 		private CharacterController _controller;
 		private StarterAssetsInputs _input;
 		private GameObject _mainCamera;
+		private Footsteps _footsteps;
 
 		private const float _threshold = 0.01f;
 
@@ -142,10 +100,9 @@ namespace StarterAssets
 		{
 			_controller = GetComponent<CharacterController>();
 			_input = GetComponent<StarterAssetsInputs>();
-			_cinemachineImpulseSource = GetComponent<CinemachineImpulseSource>();
-			_audioSource = GetComponent<AudioSource>();
+			_footsteps = GetComponent<Footsteps>();
 #if ENABLE_INPUT_SYSTEM
-            _playerInput = GetComponent<PlayerInput>();
+			_playerInput = GetComponent<PlayerInput>();
 #else
 			Debug.LogError( "Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it");
 #endif
@@ -159,8 +116,7 @@ namespace StarterAssets
 		{
 			JumpAndGravity();
 			GroundedCheck();
-            SurfaceScan();
-            Move();
+			Move();
 		}
 
 		private void LateUpdate()
@@ -238,49 +194,26 @@ namespace StarterAssets
 			{
 				// move
 				inputDirection = transform.right * _input.move.x + transform.forward * _input.move.y;
+				_footsteps.walking = true;
 				if (targetSpeed == SprintSpeed)
 				{
-                    _moving = SprintSpeed / MoveSpeed;
+					_footsteps.sprinting = SprintSpeed / MoveSpeed;
 				}
 				else
 				{
-					_moving = 1;
+                    _footsteps.sprinting = 1;
                 }
-                _activeMovingEffectsCoroutine ??= StartCoroutine(MovingEffects());
-            }
+			}
 			else
 			{
-				if (_activeMovingEffectsCoroutine is not null)
-					StopCoroutine(_activeMovingEffectsCoroutine);
-				_activeMovingEffectsCoroutine = null;
-				_moving = 0;
-            }
+                _footsteps.walking = false;
+			}
 
 			// move the player
 			_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
 
 
 		}
-
-		private void SurfaceScan()
-		{
-            if (Physics.Raycast(transform.position, -transform.up, out var hitInfo, Mathf.Infinity, groundLayerMask)) // Performs downward raycasting to identify the surface tag beneath the player
-            {
-                if (hitInfo.collider.TryGetComponent<SurfaceTag>(out var surfaceTag))
-                {
-                    // If the surface has a surface tag, use the corresponding sound list
-					var tempSoundElementObject = footstepsSounds.First(item => item.surfaceType == surfaceTag.surfaceTag);
-					_activeSoundsList = tempSoundElementObject.surfaceSounds;
-					_activeFootstepsSoundDelay = tempSoundElementObject.footstepsSoundDelay;
-                }
-                else
-                {
-					// If the surface doesn't have a surface tag, use the default sound list
-					_activeSoundsList = defaultFootstepsSounds;
-                    _activeFootstepsSoundDelay = defaultFootstepsSoundDelay;
-                }
-            }
-        }
 
 		private void JumpAndGravity()
 		{
@@ -330,17 +263,7 @@ namespace StarterAssets
 			}
 		}
 
-		private IEnumerator MovingEffects()
-        {
-            while (true)
-            {
-                _audioSource.PlayOneShot(_activeSoundsList[Random.Range(0, _activeSoundsList.Count)]); // Play the random sound from the active sound list
-                _cinemachineImpulseSource.GenerateImpulse(cameraShakeMultiplier);
-                yield return new WaitForSeconds(_activeFootstepsSoundDelay / _moving); // Choosing the appropriate delay based on the player movement speed 
-            }
-        }
-
-        private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
+		private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
 		{
 			if (lfAngle < -360f) lfAngle += 360f;
 			if (lfAngle > 360f) lfAngle -= 360f;
@@ -349,8 +272,8 @@ namespace StarterAssets
 
 		private void OnDrawGizmosSelected()
 		{
-			Color transparentGreen = new(0.0f, 1.0f, 0.0f, 0.35f);
-			Color transparentRed = new(1.0f, 0.0f, 0.0f, 0.35f);
+			Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
+			Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
 
 			if (Grounded) Gizmos.color = transparentGreen;
 			else Gizmos.color = transparentRed;

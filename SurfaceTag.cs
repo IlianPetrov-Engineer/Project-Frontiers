@@ -1,4 +1,3 @@
-using StarterAssets;
 using System.Linq;
 using UnityEngine;
 
@@ -15,7 +14,7 @@ public class SurfaceTag : MonoBehaviour
     {
         if (!CheckSoundAvailability(out string error))
         {
-            Debug.LogError(error);
+            Debug.Log(error);
         }
     }
 
@@ -24,14 +23,22 @@ public class SurfaceTag : MonoBehaviour
         GameObject player = GameObject.FindGameObjectWithTag("Player"); // Is there an object with tag Player ni the scene
         if (player != null)
         {
-            if (player.GetComponent<FirstPersonController>().footstepsSounds.Any(item => item.surfaceType == surfaceTag)) // Does SurfaceSound list contains the selected tag
+            if (player.TryGetComponent<SurfaceSounds>(out SurfaceSounds surfaceSounds)) // Does the player object contains SurfaceSound
             {
-                error = null;
-                return true;
+                if (surfaceSounds.sounds.Any(item => item.surfaceType == surfaceTag)) // Does SurfaceSound list contains the selected tag
+                {
+                    error = null;
+                    return true;
+                }
+                else
+                {
+                    error = "There is no surface type created that matches the selected surface tag.";
+                    return false;
+                }
             }
             else
             {
-                error = $"There is no surface type created that matches the selected surface tag - \"{surfaceTag}\" for the object {gameObject}.";
+                error = "There is no SurfaceSounds component attached to the Player.";
                 return false;
             }
         }
