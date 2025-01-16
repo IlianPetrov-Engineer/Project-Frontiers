@@ -40,7 +40,11 @@ public class SurfaceSounds : MonoBehaviour
     private void Start()
     {
         footsteps = GetComponent<Footsteps>();
-        if (sounds.First(item => item.surfaceType == "__") is null) // If the SoundElements list doesn't have a default value, create it
+        try // If the SoundElements list doesn't have a default value, create it
+        {
+            sounds.First(item => item.surfaceType == "__");
+        }
+        catch
         {
             SoundElement tempElement = new()
             {
