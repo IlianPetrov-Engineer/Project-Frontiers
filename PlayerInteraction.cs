@@ -21,12 +21,6 @@ public class PlayerInteraction : MonoBehaviour
     public PlayerItems playerItems; // Link to the PlayerItems script
     public PlayerQuest playerQuest; // Link to the PlayerQuest script
 
-    private void Start()
-    {
-        playerItems = GameObject.FindObjectOfType<PlayerItems>(); //Finds the playerItems script
-        playerQuest = GameObject.FindObjectOfType<PlayerQuest>(); //Finds the playerQuest script
-    }
-
     void Update()
     {
         // Perform raycast to detect interactibles
