@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -15,7 +14,6 @@ public enum DeactivationMode
 [System.Serializable]
 public class OnCollisionEnterEvent
 {
-    public List<string> conditionsToMatch;
     public string tag;
     public UnityEvent onCollisionEnter;
 }
@@ -32,10 +30,8 @@ public class Interactable : MonoBehaviour
     public float activateHoldingDuration;
     public float deactivateHoldingDuration;
     public bool active;
-    
     private bool _outlineEnabled;
     private Outline _outline;
-    private Conditions _conditions;
     
     public void Activate()
     {
@@ -71,7 +67,6 @@ public class Interactable : MonoBehaviour
         }
 
         InitializeOutline();
-        InitializeConditions();
     }
     
     private void Update()
@@ -85,16 +80,6 @@ public class Interactable : MonoBehaviour
     {
         var collisionEvent = onCollisionEnterEvents.Find(
             evt => collision.gameObject.CompareTag(evt.tag));
-        
-        if (collisionEvent == null) { return; }
-
-        if (collisionEvent.conditionsToMatch.Any())
-        {
-            if (!collisionEvent.conditionsToMatch.All(condition => _conditions.GetCondition(condition)))
-            {
-                return;
-            }
-        }
 
         collisionEvent?.onCollisionEnter.Invoke();
     }
@@ -109,26 +94,9 @@ public class Interactable : MonoBehaviour
     
     private void SetOutlineState(bool isEnabled)
     {
-        if (_outline)
+        if (_outline != null)
         {
             _outline.enabled = isEnabled;
-        }
-    }
-
-    private void InitializeConditions()
-    {
-        var definedConditions = onCollisionEnterEvents
-            .SelectMany(item => item.conditionsToMatch)
-            .ToList();
-        if (TryGetComponent<Conditions>(out var conditions) && definedConditions.Any())
-        {
-            _conditions = conditions;
-            var allConditions = conditions.GetConditionNames();
-
-            foreach (var condition in definedConditions.Where(condition => !allConditions.Contains(condition)))
-            {
-                Debug.LogError($"Could not find defined condition {condition} in all conditions.");
-            }
         }
     }
 }
